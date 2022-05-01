@@ -1,0 +1,53 @@
+---
+- name: Installing cybepanel
+  hosts: ansible_client
+  user: ubuntu
+  become: yes
+  become_user: root
+  become_method: sudo
+  tasks:
+          - name: Installing screen
+            apt:
+                    name: screen
+                    state: present
+          - name: Download the script
+            get_url:
+                    url=https://cyberpanel.net/install.sh
+                    dest=/root/installer.sh
+
+          - name: Execute the script
+            become: yes
+            become_method: su
+            become_user: root
+            become_exe: sudo su -
+            expect:
+                    command:
+                           screen -S cyberpanel-installation
+                           sh installer.sh
+                    echo: yes
+                    responses:
+                           (.*) Please enter the number(>*): "1"
+                           'Full installation \[Y/n\]:': "Y"
+                           (.*) Remote MySQL(.*): "N"
+                           (.*)Enter specific version such as:(.*): ""
+                           (.*)Choose(.*)password(.*): "r"
+                           'Please select \[Y/n\]:': "Y"
+                           (.*)Please type Yes or no(.*): "no"
+                           'Would you like to restart your server now? \[y/N\]:': "y"
+
+            async: 1800
+            poll: 5
+            register: output
+
+
+          - name: 'Checking the status'
+            async_status:
+              jid: "{{ output.ansible_job_id }}"
+            register: job_result
+            until: job_result.finished
+            retries: 150
+            delay: 60
+
+          - name: debugging
+            debug:
+                   var=output
